@@ -77,7 +77,8 @@ def get_flash(arch=None):
  else:
   raise MainError("unsupported architecture %s" % arch)
  
- url1 = ("https://get.adobe.com/flashplayer/otherversions/")
+ url1 = "https://get.adobe.com/flashplayer/otherversions/"
+ request(url1)
  url2 = "https://get.adobe.com/flashplayer/webservices/json/?platform_type=Linux&platform_dist=&platform_arch=%s&browser_arch=&browser_type=&browser_vers=&browser_dist=&eventname=flashplayerotherversions"
  url2 %= arch
  time.sleep(0.463)
@@ -93,9 +94,9 @@ def get_flash(arch=None):
  url3 = "https://get.adobe.com/flashplayer/download/?installer=%s&standalone=1"
  url3 %= cgi.escape(name)
  time.sleep(0.361)
- request(url3, url2)
+ request(url3, referer=url2)
  time.sleep(0.883)
- return io.BytesIO(request(url4, url3))
+ return io.BytesIO(request(url4, referer=url3))
 
 
 def request(url, referer=None):
@@ -117,8 +118,8 @@ def firefox_version(today=None):
  epoch_version = 27
  today = today or datetime.date.today()
  days = (today - epoch_date).days
- weeks = days / 7
- cycles = weeks / 6
+ weeks = days // 7
+ cycles = weeks // 6
  return epoch_version + cycles
 
 
