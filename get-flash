@@ -1,0 +1,137 @@
+#!/usr/bin/env python3
+
+"""Downloads and extracts the latest PPAPI Flash plugin directly from Adobe."""
+
+# Copyright (c) 2014, 2016 Scott Zeid <https://s.zeid.me/>.
+# Released under the X11 License:  <https://tldrlegal.com/l/x11>
+# <https://code.s.zeid.me/get-flash>
+
+import argparse
+import cgi
+import datetime
+import io
+import json
+import os
+import platform
+import re
+import sys
+import tarfile
+import time
+import urllib.request
+
+
+class MainError(Exception):
+ pass
+
+
+def main(argv):
+ try:
+  hep_easter_egg = len(argv) >= 2 and argv[1] == "--hep"
+  if not hep_easter_egg:
+   p = argparse.ArgumentParser(
+    description=__doc__.splitlines()[0].rstrip(),
+   )
+   p.add_argument("--hep", dest="_hep_easter_egg", action="store_true",
+                  help=argparse.SUPPRESS)
+   p.add_argument("-o", "--output", required=True,
+                  help="(required) the directory to which to extract the"
+                       " archive (will be created if necessary)")
+   p.add_argument("-A", "--arch", "--architecture", choices=["x86_64", "i686"],
+                  help="download for the given architecture")
+   
+   try:
+    args = p.parse_args(argv[1:])
+   except SystemExit as exc:
+    return exc.code
+   
+   hep_easter_egg = args._hep_easter_egg
+  
+  if hep_easter_egg:
+   print("Hep!  Hep!  I'm covered in sawlder! ... Eh?  Nobody comes.")
+   print("--Red Green, https://www.youtube.com/watch?v=qVeQWtVzkAQ#t=6m27s")
+   return 0
+  
+  archive = get_flash(args.arch)
+  if not os.path.exists(args.output):
+   os.makedirs(args.output)
+  if not os.path.isdir(args.output):
+   raise MainError("output path exists but is not a directory")
+  
+  tf = tarfile.open(mode="r", fileobj=archive)
+  tf.extractall(args.output)
+  tf.close()
+  
+  return 0
+ except MainError as e:
+  print("get-flash: error: " + str(e), file=sys.stderr)
+  return 1
+
+
+def get_flash(arch=None):
+ if arch is None:
+  arch = platform.processor()
+ if arch == "x86_64" or arch == "x86-64":
+  arch = "x86-64"
+ elif re.search(r"^i[0-9]86$", arch) or arch == "x86-32":
+  arch = "x86-32"
+ else:
+  raise MainError("unsupported architecture %s" % arch)
+ 
+ url1 = ("https://get.adobe.com/flashplayer/otherversions/")
+ url2 = "https://get.adobe.com/flashplayer/webservices/json/?platform_type=Linux&platform_dist=&platform_arch=%s&browser_arch=&browser_type=&browser_vers=&browser_dist=&eventname=flashplayerotherversions"
+ url2 %= arch
+ time.sleep(0.463)
+ installers = json.loads(request(url2, referer=url1).decode("utf-8"))
+ url4 = name = None
+ for i in installers:
+  if "ppapi" in i["download_url"]:
+   url4 = i["download_url"]
+   name = i["queryName"]
+   break
+ if not url4:
+  raise MainError("could not find PPAPI plugin download URL")
+ url3 = "https://get.adobe.com/flashplayer/download/?installer=%s&standalone=1"
+ url3 %= cgi.escape(name)
+ time.sleep(0.361)
+ request(url3, url2)
+ time.sleep(0.883)
+ return io.BytesIO(request(url4, url3))
+
+
+def request(url, referer=None):
+ req = urllib.request.Request(url)
+ req.add_header("User-Agent", user_agent())
+ if referer:
+  req.add_header("Referer", referer)
+ with urllib.request.urlopen(req) as f:
+  return f.read()
+
+
+def firefox_version(today=None):
+ """Returns (approximately) the latest major version of Firefox."""
+ 
+ if today != None and not isinstance(today, datetime.date):
+  raise TypeError("today must be a datetime.date")
+ 
+ epoch_date = datetime.date(2014, 2, 4)
+ epoch_version = 27
+ today = today or datetime.date.today()
+ days = (today - epoch_date).days
+ weeks = days / 7
+ cycles = weeks / 6
+ return epoch_version + cycles
+
+
+def user_agent(today=None):
+ """Returns a user agent string for (approximately) the latest major version of Firefox."""
+ 
+ tpl = "Mozilla/5.0 (X11; Linux x86_64; rv:{v}) Gecko/20100101 Firefox/{v}"
+ version = str(firefox_version(today)) + ".0"
+ return tpl.format(v=version)
+
+
+if __name__ == "__main__":
+ try:
+  sys.exit(main(sys.argv))
+ except KeyboardInterrupt:
+  pass
