@@ -8,6 +8,8 @@ Copyright (c) 2014, 2016 [Scott Zeid](https://s.zeid.me/).
 Released under [the X11 License](https://tldrlegal.com/l/x11).  
 <https://code.s.zeid.me/get-flash>
 
+[**Download**](https://code.s.zeid.me/get-flash/raw/master/get-flash)
+
 
 Usage
 -----
