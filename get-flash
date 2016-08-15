@@ -101,27 +101,27 @@ def get_flash(arch=None):
  else:
   raise MainError("unsupported architecture %s" % arch)
  
- url1 = "https://get.adobe.com/flashplayer/otherversions/"
- request(url1)
- url2 = "https://get.adobe.com/flashplayer/webservices/json/?platform_type=Linux&platform_dist=&platform_arch=%s&browser_arch=&browser_type=&browser_vers=&browser_dist=&eventname=flashplayerotherversions"
- url2 %= arch
+ url_landing = "https://get.adobe.com/flashplayer/otherversions/"
+ request(url_landing)
+ url_installers = "https://get.adobe.com/flashplayer/webservices/json/?platform_type=Linux&platform_dist=&platform_arch=%s&browser_arch=&browser_type=&browser_vers=&browser_dist=&eventname=flashplayerotherversions"
+ url_installers %= arch
  time.sleep(0.463)
- installers = json.loads(request(url2, referer=url1).decode("utf-8"))
- url4 = name = None
+ installers = json.loads(request(url_installers, referer=url_landing).decode("utf-8"))
+ url_download = name = None
  for i in installers:
   if "ppapi" in i["download_url"]:
-   url4 = i["download_url"]
+   url_download = i["download_url"]
    name = i["queryName"]
    break
- if not url4:
+ if not url_download:
   raise MainError("could not find PPAPI plugin download URL")
- url3 = "https://get.adobe.com/flashplayer/download/?installer=%s&standalone=1"
- url3 %= cgi.escape(name)
+ url_confirm = "https://get.adobe.com/flashplayer/download/?installer=%s&standalone=1"
+ url_confirm %= cgi.escape(name)
  time.sleep(0.361)
- request(url3, referer=url2)
+ request(url_confirm, referer=url_installers)
  time.sleep(0.883)
- result = NamedBytesIO(request(url4, referer=url3))
- result.name = os.path.basename(urllib.parse.urlparse(url4).path)
+ result = NamedBytesIO(request(url_download, referer=url_confirm))
+ result.name = os.path.basename(urllib.parse.urlparse(url_download).path)
  return result
 
 
