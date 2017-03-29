@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 
-"""Downloads the latest PPAPI Flash plugin directly from Adobe."""
+"""Downloads the latest NPAPI or PPAPI Flash plugin directly from Adobe."""
 
-# Copyright (c) 2014, 2016 Scott Zeid.  <https://s.zeid.me/>
+# Copyright (c) 2014, 2016-2017 Scott Zeid.  <https://s.zeid.me/>
 # Released under the X11 License:  <https://tldrlegal.com/l/x11>
 # <https://code.s.zeid.me/get-flash>
 
 import argparse
 import cgi
 import datetime
+import enum
 import io
 import json
 import os
@@ -19,6 +20,11 @@ import tarfile
 import time
 import urllib.parse
 import urllib.request
+
+
+class APIs(enum.Enum):
+ PPAPI = 1  #enum.auto()
+ NPAPI = 2  #enum.auto()
 
 
 class MainError(Exception):
@@ -40,11 +46,21 @@ def main(argv):
                   help=argparse.SUPPRESS)
    p.add_argument("-a", "--arch", "--architecture", choices=["x86_64", "i686"],
                   help="download for the given architecture")
-   g = p.add_argument_group("at least one of the following is required")
+   g = p.add_argument_group("APIs - exactly one of the following is required")
+   m = g.add_mutually_exclusive_group(required=True)
+   m.add_argument("-n", "--npapi",
+                  action="store_const", dest="api", const=APIs.NPAPI,
+                  help="download the NPAPI version (for use with Firefox and related"
+                       " browsers)")
+   m.add_argument("-p", "--ppapi", "--pepper",
+                  action="store_const", dest="api", const=APIs.PPAPI,
+                  help="download the PPAPI version (for use with Chrome and related"
+                       " browsers)")
+   g = p.add_argument_group("output options - at least one of the following is required")
    g.add_argument("-o", "--output", metavar="OUTPUT_TO",
-                  help="save the archive to the given filename or directory")
+                  help="save the .tar.gz archive to the given filename or directory")
    g.add_argument("-e", "--extract", metavar="EXTRACT_TO",
-                  help="extract the archive to the given directory"
+                  help="extract the .tar.gz archive to the given directory"
                        " (will be created if necessary)")
    
    try:
@@ -65,7 +81,7 @@ def main(argv):
    print("--Red Green, https://www.youtube.com/watch?v=qVeQWtVzkAQ#t=6m27s")
    return 0
   
-  archive = get_flash(args.arch)
+  archive = get_flash(args.api, args.arch)
   
   if args.output:
    filename = args.output
@@ -91,7 +107,12 @@ def main(argv):
   return 1
 
 
-def get_flash(arch=None):
+def get_flash(api=None, arch=None):
+ api = getattr(api, "name", api).upper()
+ if api not in APIs.__members__.keys():
+  raise ValueError("unsupported API: %s" % api)
+ api = api.lower()
+ 
  if arch is None:
   arch = platform.processor()
  if arch == "x86_64" or arch == "x86-64":
@@ -99,7 +120,7 @@ def get_flash(arch=None):
  elif re.search(r"^i[0-9]86$", arch) or arch == "x86-32":
   arch = "x86-32"
  else:
-  raise MainError("unsupported architecture %s" % arch)
+  raise MainError("unsupported architecture: %s" % arch)
  
  url_landing = "https://get.adobe.com/flashplayer/otherversions/"
  request(url_landing)
@@ -109,12 +130,12 @@ def get_flash(arch=None):
  installers = json.loads(request(url_installers, referer=url_landing).decode("utf-8"))
  url_download = name = None
  for i in installers:
-  if "ppapi" in i["download_url"]:
+  if api in i["download_url"] and ".tar.gz" in i["download_url"]:
    url_download = i["download_url"]
    name = i["queryName"]
    break
  if not url_download:
-  raise MainError("could not find PPAPI plugin download URL")
+  raise MainError("could not find %s plugin download URL" % api.upper())
  url_confirm = "https://get.adobe.com/flashplayer/download/?installer=%s&standalone=1"
  url_confirm %= cgi.escape(name)
  time.sleep(0.361)
